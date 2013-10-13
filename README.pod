@@ -1,0 +1,108 @@
+=pod
+
+=encoding utf-8
+
+=head1 NAME
+
+HTTP::Tiny::SPDY - A subclass of HTTP::Tiny with SPDY support
+
+=head1 VERSION
+
+version 0.001
+
+=head1 SYNOPSIS
+
+    use HTTP::Tiny::SPDY;
+
+    my $response = HTTP::Tiny::SPDY->new->get('https://example.com/');
+
+    die "Failed!\n" unless $response->{success};
+
+    print "$response->{status} $response->{reason}\n";
+
+    while (my ($k, $v) = each %{$response->{headers}}) {
+        for (ref $v eq 'ARRAY' ? @$v : $v) {
+            print "$k: $_\n";
+        }
+    }
+
+    print $response->{content} if length $response->{content};
+
+=head1 DESCRIPTION
+
+This is a subclass of L<HTTP::Tiny> with added support for the SPDY protocol. It
+is intended to be fully compatible with HTTP::Tiny so that it can be used as a
+drop-in replacement for it.
+
+=head1 METHODS
+
+=head2 new
+
+    $http = HTTP::Tiny::SPDY->new( %attributes );
+
+Constructor that returns a new HTTP::Tiny::SPDY object. It accepts the same
+attributes as the constructor of HTTP::Tiny, and one additional attribute:
+
+=over 4
+
+=item *
+
+C<enable_SPDY>
+
+A boolean that indicates if a SPDY connection should be negotiated for HTTPS
+requests (default is true)
+
+=back
+
+=head1 SEE ALSO
+
+=over 4
+
+=item *
+
+L<HTTP::Tiny>
+
+=item *
+
+L<Net::SPDY>
+
+=item *
+
+L<SPDY Project Homepage|http://dev.chromium.org/spdy/>
+
+=back
+
+=head1 ACKNOWLEDGEMENTS
+
+SPDY protocol support is provided by L<Net::SPDY>, written by Lubomir Rintel.
+
+=for :stopwords cpan testmatrix url annocpan anno bugtracker rt cpants kwalitee diff irc mailto metadata placeholders metacpan
+
+=head1 SUPPORT
+
+=head2 Bugs / Feature Requests
+
+Please report any bugs or feature requests through the issue tracker
+at L<https://github.com/odyniec/p5-HTTP-Tiny-SPDY/issues>.
+You will be notified automatically of any progress on your issue.
+
+=head2 Source Code
+
+This is open source software.  The code repository is available for
+public review and contribution under the terms of the license.
+
+L<https://github.com/odyniec/p5-HTTP-Tiny-SPDY>
+
+  git clone https://github.com/odyniec/p5-HTTP-Tiny-SPDY.git
+
+=head1 AUTHOR
+
+Michal Wojciechowski <odyniec@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2013 by Michal Wojciechowski.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
