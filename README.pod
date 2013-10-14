@@ -8,7 +8,7 @@ HTTP::Tiny::SPDY - A subclass of HTTP::Tiny with SPDY support
 
 =head1 VERSION
 
-version 0.001
+version 0.012
 
 =head1 SYNOPSIS
 
