@@ -1,6 +1,7 @@
 Revision history for HTTP-Tiny-SPDY
 
 {{$NEXT}}
+          Version bump due to fixed release process.
 
 0.012     2013-10-14
           First version, released on an unsuspecting world.
