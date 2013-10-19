@@ -66,65 +66,24 @@ use parent -norequire, 'HTTP::Tiny::Handle';
 sub connect {
     @_ == 4 || die(q/Usage: $handle->connect(scheme, host, port)/ . "\n");
     my ($self, $scheme, $host, $port) = @_;
- 
-    if ( $scheme eq 'https' ) {
-        # Need IO::Socket::SSL 1.42 for SSL_create_ctx_callback
-        die(qq/IO::Socket::SSL 1.42 must be installed for https support\n/)
-            unless eval {require IO::Socket::SSL; IO::Socket::SSL->VERSION(1.42)};
-        # Need Net::SSLeay 1.49 for MODE_AUTO_RETRY
-        die(qq/Net::SSLeay 1.49 must be installed for https support\n/)
-            unless eval {require Net::SSLeay; Net::SSLeay->VERSION(1.49)};
-    }
-    elsif ( $scheme ne 'http' ) {
-      die(qq/Unsupported URL scheme '$scheme'\n/);
-    }
-    $self->{fh} = 'IO::Socket::INET'->new(
-        PeerHost  => $host,
-        PeerPort  => $port,
-        $self->{local_address} ?
-            ( LocalAddr => $self->{local_address} ) : (),
-        Proto     => 'tcp',
-        Type      => SOCK_STREAM,
-        Timeout   => $self->{timeout}
-    ) or die(qq/Could not connect to '$host:$port': $@\n/);
- 
-    binmode($self->{fh})
-      or die(qq/Could not binmode() socket: '$!'\n/);
 
-    if ( $scheme eq 'https') {
-        my $ssl_args = $self->_ssl_args($host);
-
-        $ssl_args->{SSL_npn_protocols} = ['spdy/3'];
-        
-        IO::Socket::SSL->start_SSL(
-            $self->{fh},
-            %$ssl_args,
-            SSL_create_ctx_callback => sub {
-                my $ctx = shift;
-                Net::SSLeay::CTX_set_mode($ctx, Net::SSLeay::MODE_AUTO_RETRY());
-            },
-        );
- 
-        unless ( ref($self->{fh}) eq 'IO::Socket::SSL' ) {
-            my $ssl_err = IO::Socket::SSL->errstr;
-            die(qq/SSL connection failed for $host: $ssl_err\n/);
-        }
-
-        if ($self->{fh}->next_proto_negotiated &&
-            $self->{fh}->next_proto_negotiated eq 'spdy/3')
-        {
-            # SPDY negotiation succeeded
-            $self->{spdy} = {
-                session => Net::SPDY::Session->new($self->{fh}),
-                stream_id => 1,
-            };
-        }
+    if ($scheme eq 'https') {
+        $self->{SSL_options}->{SSL_npn_protocols} = ['spdy/3'];
     }
 
-    $self->{host} = $host;
-    $self->{port} = $port;
- 
-    return $self;   
+    $self->SUPER::connect($scheme, $host, $port);
+
+    if ($scheme eq 'https' && $self->{fh}->next_proto_negotiated &&
+        $self->{fh}->next_proto_negotiated eq 'spdy/3')
+    {
+        # SPDY negotiation succeeded
+        $self->{spdy} = {
+            session => Net::SPDY::Session->new($self->{fh}),
+            stream_id => 1,
+        };
+    }
+
+    return $self;
 }
 
 my $Printable = sub {
@@ -286,6 +245,8 @@ sub read_response {
                 delta_window_size => 0x00010000,
             );
         }
+
+        return $response;
     }
     else {
         # Traditional HTTP(S) connection
