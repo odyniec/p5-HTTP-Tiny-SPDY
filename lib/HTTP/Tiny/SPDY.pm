@@ -14,7 +14,7 @@ use parent 'HTTP::Tiny';
 
 my @attributes;
 BEGIN {
-    @attributes = qw(enable_SPDY handle_class);
+    @attributes = qw(enable_SPDY);
     no strict 'refs';
     for my $accessor (@attributes) {
         *{$accessor} = sub {
@@ -43,9 +43,14 @@ sub new {
     my $self = $class->SUPER::new(%args);
 
     $self->{enable_SPDY} = exists $args{enable_SPDY} ? $args{enable_SPDY} : 1;
-    $self->{handle_class} = 'HTTP::Tiny::Handle::SPDY';
 
     return $self;
+}
+
+sub handle_class {
+    @_ == 1 or Carp::croak(q/Usage: $http->handle_class()/ . "\n");
+    my ($self) = @_;
+    return 'HTTP::Tiny::Handle' . ($self->{enable_SPDY} ? '::SPDY' : '');
 }
 
 my %DefaultPort = (
