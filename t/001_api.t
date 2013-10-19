@@ -8,7 +8,7 @@ use HTTP::Tiny::SPDY;
 
 my @accessors = qw(
   agent default_headers local_address max_redirect max_size proxy no_proxy timeout SSL_options verify_SSL cookie_jar
-  enable_SPDY
+  enable_SPDY handle_class
 );
 my @methods   = qw(
   new get head put post delete post_form request mirror www_form_urlencode

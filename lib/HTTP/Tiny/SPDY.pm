@@ -14,7 +14,7 @@ use parent 'HTTP::Tiny';
 
 my @attributes;
 BEGIN {
-    @attributes = qw(enable_SPDY);
+    @attributes = qw(enable_SPDY handle_class);
     no strict 'refs';
     for my $accessor (@attributes) {
         *{$accessor} = sub {
@@ -43,6 +43,7 @@ sub new {
     my $self = $class->SUPER::new(%args);
 
     $self->{enable_SPDY} = exists $args{enable_SPDY} ? $args{enable_SPDY} : 1;
+    $self->{handle_class} = 'HTTP::Tiny::Handle::SPDY';
 
     return $self;
 }
@@ -52,125 +53,6 @@ my %DefaultPort = (
     https => 443,
 );
  
-sub _request {
-    my ($self, $method, $url, $args) = @_;
- 
-    my ($scheme, $host, $port, $path_query, $auth) = $self->_split_url($url);
- 
-    my $request = {
-        method    => $method,
-        scheme    => $scheme,
-        host_port => ($port == $DefaultPort{$scheme} ? $host : "$host:$port"),
-        uri       => $path_query,
-        headers   => {},
-    };
- 
-    my $handle_class = 'HTTP::Tiny::Handle' .
-        ($self->{enable_SPDY} ? '::SPDY' : '');
-        
-    my $handle  = $handle_class->new(
-        timeout         => $self->{timeout},
-        SSL_options     => $self->{SSL_options},
-        verify_SSL      => $self->{verify_SSL},
-        local_address   => $self->{local_address},
-    );
- 
-    if ($self->{proxy} && ! grep { $host =~ /\Q$_\E$/ } @{$self->{no_proxy}}) {
-        $request->{uri} = "$scheme://$request->{host_port}$path_query";
-        die(qq/HTTPS via proxy is not supported\n/)
-            if $request->{scheme} eq 'https';
-        $handle->connect(($self->_split_url($self->{proxy}))[0..2]);
-    }
-    else {
-        $handle->connect($scheme, $host, $port);
-    }
-
-    $self->_prepare_headers_and_cb($request, $args, $url, $auth);
-
-    $handle->write_request($request);
-
-    my $response;
-
-    if (defined $handle->{spdy}) {
-        # SPDY connection
-        my $framer = $handle->{spdy}->{session}->{framer};
-
-        while (my %frame = $framer->read_frame) {
-            if (exists $frame{type} &&
-                $frame{type} == Net::SPDY::Framer::SYN_REPLY)
-            {
-                my %frame_headers = @{$frame{headers}};
-                my @http_headers = @{$frame{headers}};
-
-                ($response->{status}, $response->{reason}) =
-                    split /[\x09\x20]+/, delete($frame_headers{':status'}), 2;
-
-                $response->{headers} = {};
-
-                for (my $i = 0; $i < $#http_headers; $i += 2) {
-                    if ($http_headers[$i] !~ /^:/) {
-                        my $field_name = lc $http_headers[$i];
-
-                        if (exists $response->{headers}->{$field_name}) {
-                            if (ref $response->{headers}->{$field_name} ne 'ARRAY') {
-                                $response->{headers}->{$field_name} = [
-                                    $response->{headers}->{$field_name}
-                                ];
-
-                                push @{$response->{headers}->{$field_name}}, $http_headers[$i+1];
-                            }
-                        }
-                        else {
-                            $response->{headers}->{$field_name} = $http_headers[$i+1];
-                        }
-                    }
-                }
-            }
-
-            if (!$frame{control}) {
-                # TODO: Add support for max_size
-                $response->{content} .= $frame{data};
-            }
-
-            last if ($frame{flags} & Net::SPDY::Framer::FLAG_FIN);
-
-            # FIXME: Probably need to do better than just saying "throw another
-            # 64K on us" after each and every frame
-            $framer->write_frame(
-                control => 1,
-                type => Net::SPDY::Framer::WINDOW_UPDATE,
-                stream_id => $frame{stream_id},
-                delta_window_size => 0x00010000,
-            );
-        }
-    }
-    else {
-        # Traditional HTTP(S) connection
-        do { $response = $handle->read_response_header }
-            until (substr($response->{status},0,1) ne '1');
-     
-        $self->_update_cookie_jar( $url, $response ) if $self->{cookie_jar};
-     
-        if ( my @redir_args = $self->_maybe_redirect($request, $response, $args) ) {
-            $handle->close;
-            return $self->_request(@redir_args, $args);
-        }
-     
-        if ($method eq 'HEAD' || $response->{status} =~ /^[23]04/) {
-            # response has no message body
-        }
-        else {
-            my $data_cb = $self->_prepare_data_cb($response, $args);
-            $handle->read_body($data_cb, $response);
-        }
-    }
- 
-    $handle->close;
-    $response->{success} = substr($response->{status},0,1) eq '2';
-    $response->{url} = $url;
-    return $response;
-}
-
 package
     HTTP::Tiny::Handle::SPDY;
 
@@ -343,6 +225,71 @@ sub write_request {
     }
     else {
         return $self->SUPER::write_request($request);
+    }
+}
+
+sub read_response {
+    @_ == 1 || die(q/Usage: $handle->read_response()/ . "\n");
+    my($self) = @_;
+
+    my $response;
+
+    if (defined $self->{spdy}) {
+        # SPDY connection
+        my $framer = $self->{spdy}->{session}->{framer};
+
+        while (my %frame = $framer->read_frame) {
+            if (exists $frame{type} &&
+                $frame{type} == Net::SPDY::Framer::SYN_REPLY)
+            {
+                my %frame_headers = @{$frame{headers}};
+                my @http_headers = @{$frame{headers}};
+
+                ($response->{status}, $response->{reason}) =
+                    split /[\x09\x20]+/, delete($frame_headers{':status'}), 2;
+
+                $response->{headers} = {};
+
+                for (my $i = 0; $i < $#http_headers; $i += 2) {
+                    if ($http_headers[$i] !~ /^:/) {
+                        my $field_name = lc $http_headers[$i];
+
+                        if (exists $response->{headers}->{$field_name}) {
+                            if (ref $response->{headers}->{$field_name} ne 'ARRAY') {
+                                $response->{headers}->{$field_name} = [
+                                    $response->{headers}->{$field_name}
+                                ];
+
+                                push @{$response->{headers}->{$field_name}}, $http_headers[$i+1];
+                            }
+                        }
+                        else {
+                            $response->{headers}->{$field_name} = $http_headers[$i+1];
+                        }
+                    }
+                }
+            }
+
+            if (!$frame{control}) {
+                # TODO: Add support for max_size
+                $response->{content} .= $frame{data};
+            }
+
+            last if ($frame{flags} & Net::SPDY::Framer::FLAG_FIN);
+
+            # FIXME: Probably need to do better than just saying "throw another
+            # 64K on us" after each and every frame
+            $framer->write_frame(
+                control => 1,
+                type => Net::SPDY::Framer::WINDOW_UPDATE,
+                stream_id => $frame{stream_id},
+                delta_window_size => 0x00010000,
+            );
+        }
+    }
+    else {
+        # Traditional HTTP(S) connection
+        return undef;
     }
 }
 
