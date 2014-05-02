@@ -10,7 +10,7 @@ use t::Util    qw[tmpfile rewind slurp monkey_patch dir_list parse_case
 use HTTP::Tiny::SPDY;
 BEGIN { monkey_patch() }
 
-for my $file ( dir_list("t/cases", qr/^put/ ) ) {
+for my $file ( dir_list("t/cases", qr/^delete/ ) ) {
   my $data = do { local (@ARGV,$/) = $file; <> };
   my ($params, $expect_req, $give_res) = split /--+\n/, $data;
   # cleanup source data
@@ -45,13 +45,13 @@ for my $file ( dir_list("t/cases", qr/^put/ ) ) {
   my $res_fh = tmpfile($give_res);
   my $req_fh = tmpfile();
 
-  my $http = HTTP::Tiny::SPDY->new;
+  my $http = HTTP::Tiny::SPDY->new( keep_alive => 0 );
   set_socket_source($req_fh, $res_fh);
 
   (my $url_basename = $url) =~ s{.*/}{};
 
   my @call_args = %options ? ($url, \%options) : ($url);
-  my $response  = $http->put(@call_args);
+  my $response  = $http->delete(@call_args);
 
   my $got_req = slurp($req_fh);
 

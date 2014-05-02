@@ -31,3 +31,5 @@ for my $test (@tests) {
     my $exp = $test;
     is_deeply($got, $exp, "->split_url('$url')") or diag explain $got;
 }
+
+

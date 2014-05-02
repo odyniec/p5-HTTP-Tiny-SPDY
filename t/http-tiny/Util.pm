@@ -147,13 +147,14 @@ sub sort_headers {
     sub connect_args { return ($monkey_host, $monkey_port) }
 
     sub monkey_patch {
-        no warnings qw/redefine once/;        
+        no warnings qw/redefine once/;
         *HTTP::Tiny::Handle::SPDY::can_read = sub {1};
         *HTTP::Tiny::Handle::SPDY::can_write = sub {1};
         *HTTP::Tiny::Handle::SPDY::connect = sub {
             my ($self, $scheme, $host, $port) = @_;
-            $self->{host} = $monkey_host = $host;
-            $self->{port} = $monkey_port = $port;
+            $self->{host}   = $monkey_host = $host;
+            $self->{port}   = $monkey_port = $port;
+            $self->{scheme} = $scheme;
             $self->{fh} = shift @req_fh;
             return $self;
         };
@@ -165,7 +166,9 @@ sub sort_headers {
         };
         *HTTP::Tiny::Handle::SPDY::close = sub { 1 }; # don't close our temps
 
-        delete $ENV{http_proxy}; # don't try to proxy in mock-mode
+        # don't try to proxy in mock-mode
+        delete $ENV{http_proxy};
+        delete $ENV{$_} for map { $_, uc($_) } qw/https_proxy all_proxy/;
     }
 }
 

@@ -7,7 +7,8 @@ use Test::More tests => 2;
 use HTTP::Tiny::SPDY;
 
 my @accessors = qw(
-  agent default_headers local_address max_redirect max_size proxy no_proxy timeout SSL_options verify_SSL cookie_jar
+  agent default_headers http_proxy https_proxy keep_alive local_address
+  max_redirect max_size proxy no_proxy timeout SSL_options verify_SSL cookie_jar
   enable_SPDY
 );
 my @methods   = qw(
