@@ -143,6 +143,8 @@ sub _request {
                 delta_window_size => 0x00010000,
             );
         }
+
+        $handle->close;
     }
     else {
         # Traditional HTTP(S) connection
@@ -156,16 +158,28 @@ sub _request {
             return $self->_request(@redir_args, $args);
         }
      
+        my $known_message_length;
         if ($method eq 'HEAD' || $response->{status} =~ /^[23]04/) {
             # response has no message body
+            $known_message_length = 1;
         }
         else {
             my $data_cb = $self->_prepare_data_cb($response, $args);
-            $handle->read_body($data_cb, $response);
+            $known_message_length = $handle->read_body($data_cb, $response);
         }
+
+        if ( $self->{keep_alive}
+            && $known_message_length
+            && $response->{protocol} eq 'HTTP/1.1'
+            && ($response->{headers}{connection} || '') ne 'close'
+        ) {
+            $self->{handle} = $handle;
+        }
+        else {
+            $handle->close;
+        }        
     }
  
-    $handle->close;
     $response->{success} = substr($response->{status},0,1) eq '2';
     $response->{url} = $url;
     return $response;
