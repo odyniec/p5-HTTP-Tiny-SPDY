@@ -5,7 +5,7 @@ use warnings;
 
 use File::Basename;
 use Test::More 0.88;
-use t::Util    qw[tmpfile rewind slurp monkey_patch dir_list parse_case
+use t::http_tiny::Util    qw[tmpfile rewind slurp monkey_patch dir_list parse_case
                   set_socket_source sort_headers $CRLF $LF];
 use HTTP::Tiny::SPDY;
 use File::Temp qw/tempdir/;
@@ -24,7 +24,7 @@ my %timestamp = (
   'not-modified.txt'  => $known_epoch - 2 * $day,
 );
 
-for my $file ( dir_list("t/cases", qr/^mirror/ ) ) {
+for my $file ( dir_list("t/http_tiny/cases", qr/^mirror/ ) ) {
   1 while unlink $tempfile;
   my $data = do { local (@ARGV,$/) = $file; <> };
   my ($params, $expect_req, $give_res) = split /--+\n/, $data;

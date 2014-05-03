@@ -2,15 +2,16 @@
 
 use strict;
 use warnings;
+use open IN => ':raw';
 
 use File::Basename;
 use Test::More 0.88;
-use t::Util    qw[tmpfile rewind slurp monkey_patch dir_list parse_case
+use t::http_tiny::Util    qw[tmpfile rewind slurp monkey_patch dir_list parse_case
                   set_socket_source sort_headers $CRLF $LF];
 use HTTP::Tiny::SPDY;
 BEGIN { monkey_patch() }
 
-for my $file ( dir_list("t/cases", qr/^post/ ) ) {
+for my $file ( dir_list("t/http_tiny/cases", qr/^form/ ) ) {
   my $data = do { local (@ARGV,$/) = $file; <> };
   my ($params, $expect_req, $give_res) = split /--+\n/, $data;
   # cleanup source data
@@ -30,15 +31,24 @@ for my $file ( dir_list("t/cases", qr/^post/ ) ) {
   }
   $options{headers} = \%headers if %headers;
 
-  if ( $case->{content} ) {
-    $options{content} = $case->{content}[0];
+  my @params = split "\\|", $case->{content}[0];
+  my $formdata;
+  if ( $case->{datatype}[0] eq 'HASH' ) {
+    while ( @params ) {
+      my ($key, $value) = splice( @params, 0, 2 );
+      if ( ref $formdata->{$key} ) {
+        push @{$formdata->{$key}}, $value;
+      }
+      elsif ( exists $formdata->{$key} ) {
+        $formdata->{$key} = [ $formdata->{$key}, $value ];
+      }
+      else {
+        $formdata->{$key} = $value;
+      }
+    }
   }
-  elsif ( $case->{content_cb} ) {
-    $options{content} = eval join "\n", @{$case->{content_cb}};
-  }
-
-  if ( $case->{trailer_cb} ) {
-    $options{trailer_callback} = eval join "\n", @{$case->{trailer_cb}};
+  else {
+    $formdata = [ @params ];
   }
 
   # setup mocking and test
@@ -50,12 +60,12 @@ for my $file ( dir_list("t/cases", qr/^post/ ) ) {
 
   (my $url_basename = $url) =~ s{.*/}{};
 
-  my @call_args = %options ? ($url, \%options) : ($url);
-  my $response  = $http->post(@call_args);
+  my $response  = $http->post_form( $url, $formdata, %options ? (\%options) : ());
 
   my $got_req = slurp($req_fh);
 
   my $label = basename($file);
+
 
   is( sort_headers($got_req), sort_headers($expect_req), "$label request" );
 

@@ -59,7 +59,7 @@ plan tests => scalar keys %$data;
 while (my ($url, $data) = each %$data) {
     subtest $url => sub {
         plan 'skip_all' => 'Internet connection timed out'
-            unless IO::Socket::INET->new(
+            unless IO::Socket::http_tiny::INET->new(
                 PeerHost  => $data->{host},
                 PeerPort  => 443,
                 Proto     => 'tcp',

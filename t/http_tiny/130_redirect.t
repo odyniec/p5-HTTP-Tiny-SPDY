@@ -5,14 +5,14 @@ use warnings;
 
 use File::Basename;
 use Test::More 0.88;
-use t::Util qw[tmpfile rewind slurp monkey_patch dir_list parse_case
+use t::http_tiny::Util qw[tmpfile rewind slurp monkey_patch dir_list parse_case
   hashify connect_args clear_socket_source set_socket_source sort_headers
   $CRLF $LF];
 
 use HTTP::Tiny::SPDY;
 BEGIN { monkey_patch() }
 
-for my $file ( dir_list("t/cases", qr/^auth/ ) ) {
+for my $file ( dir_list("t/http_tiny/cases", qr/^redirect/ ) ) {
   my $label = basename($file);
   my $data = do { local (@ARGV,$/) = $file; <> };
   my ($params, @case_pairs) = split /--+\n/, $data;

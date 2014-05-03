@@ -1,4 +1,4 @@
-package t::Util;
+package t::http_tiny::Util;
 
 use strict;
 use warnings;

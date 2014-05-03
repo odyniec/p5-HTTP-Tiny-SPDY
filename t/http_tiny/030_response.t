@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Test::More qw[no_plan];
-use t::Util    qw[tmpfile rewind $CRLF $LF];
+use t::http_tiny::Util    qw[tmpfile rewind $CRLF $LF];
 use HTTP::Tiny::SPDY;
 
 sub _header {

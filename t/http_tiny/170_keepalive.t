@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use File::Basename;
 use Test::More 0.88;
-use t::Util qw[
+use t::http_tiny::Util qw[
     tmpfile monkey_patch dir_list clear_socket_source set_socket_source
     $CRLF
 ];
@@ -59,7 +59,7 @@ new_ht();
 $h->{handle}->close;
 test_ht( "Socket closed", 0, 'http://foo.com' );
 
-for my $file ( dir_list( "t/cases", qr/^keepalive/ ) ) {
+for my $file ( dir_list( "t/http_tiny/cases", qr/^keepalive/ ) ) {
     my $label = basename($file);
     my $data = do { local ( @ARGV, $/ ) = $file; <> };
     my ( $title, $ok, $response ) = map { trim($_) } split /--+/, $data;

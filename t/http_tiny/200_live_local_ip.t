@@ -14,7 +14,7 @@ plan 'skip_all' => "Only run for \$ENV{AUTOMATED_TESTING}"
   unless $ENV{AUTOMATED_TESTING};
 
 plan 'skip_all' => "Internet connection timed out"
-  unless IO::Socket::INET->new(
+  unless IO::Socket::http_tiny::INET->new(
     PeerHost  => $test_host,
     PeerPort  => 80,
     Proto     => 'tcp',
