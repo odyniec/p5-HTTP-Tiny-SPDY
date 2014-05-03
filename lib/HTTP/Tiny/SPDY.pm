@@ -223,24 +223,8 @@ sub connect {
     binmode($self->{fh})
       or die(qq/Could not binmode() socket: '$!'\n/);
 
-    if ( $scheme eq 'https') {
-        my $ssl_args = $self->_ssl_args($host);
-
-        $ssl_args->{SSL_npn_protocols} = ['spdy/3'];
-        
-        IO::Socket::SSL->start_SSL(
-            $self->{fh},
-            %$ssl_args,
-            SSL_create_ctx_callback => sub {
-                my $ctx = shift;
-                Net::SSLeay::CTX_set_mode($ctx, Net::SSLeay::MODE_AUTO_RETRY());
-            },
-        );
- 
-        unless ( ref($self->{fh}) eq 'IO::Socket::SSL' ) {
-            my $ssl_err = IO::Socket::SSL->errstr;
-            die(qq/SSL connection failed for $host: $ssl_err\n/);
-        }
+    if ($scheme eq 'https') {
+        $self->start_ssl($host);
 
         if ($self->{fh}->next_proto_negotiated &&
             $self->{fh}->next_proto_negotiated eq 'spdy/3')
@@ -253,10 +237,11 @@ sub connect {
         }
     }
 
+    $self->{scheme} = $scheme;
     $self->{host} = $host;
     $self->{port} = $port;
  
-    return $self;   
+    return $self;
 }
 
 my $Printable = sub {
@@ -358,6 +343,16 @@ sub write_request {
     else {
         return $self->SUPER::write_request($request);
     }
+}
+
+sub _ssl_args {
+    my ($self, $host) = @_;
+
+    my %ssl_args = $self->SUPER::_ssl_args($host);
+
+    $ssl_args{SSL_npn_protocols} = ['spdy/3'];
+
+    return \%ssl_args;
 }
 
 1;
