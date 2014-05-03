@@ -60,30 +60,23 @@ sub _request {
     my $request = {
         method    => $method,
         scheme    => $scheme,
+        host      => $host,
         host_port => ($port == $DefaultPort{$scheme} ? $host : "$host:$port"),
         uri       => $path_query,
         headers   => {},
     };
  
-    my $handle_class = 'HTTP::Tiny::Handle' .
-        ($self->{enable_SPDY} ? '::SPDY' : '');
-        
-    my $handle  = $handle_class->new(
-        timeout         => $self->{timeout},
-        SSL_options     => $self->{SSL_options},
-        verify_SSL      => $self->{verify_SSL},
-        local_address   => $self->{local_address},
-    );
- 
-    if ($self->{proxy} && ! grep { $host =~ /\Q$_\E$/ } @{$self->{no_proxy}}) {
-        $request->{uri} = "$scheme://$request->{host_port}$path_query";
-        die(qq/HTTPS via proxy is not supported\n/)
-            if $request->{scheme} eq 'https';
-        $handle->connect(($self->_split_url($self->{proxy}))[0..2]);
+    # We remove the cached handle so it is not reused in the case of redirect.
+    # If all is well, it will be recached at the end of _request.  We only
+    # reuse for the same scheme, host and port
+    my $handle = delete $self->{handle};
+    if ( $handle ) {
+        unless ( $handle->can_reuse( $scheme, $host, $port ) ) {
+            $handle->close;
+            undef $handle;
+        }
     }
-    else {
-        $handle->connect($scheme, $host, $port);
-    }
+    $handle ||= $self->_open_handle( $request, $scheme, $host, $port );
 
     $self->_prepare_headers_and_cb($request, $args, $url, $auth);
 
@@ -183,6 +176,30 @@ sub _request {
     $response->{success} = substr($response->{status},0,1) eq '2';
     $response->{url} = $url;
     return $response;
+}
+
+sub _open_handle {
+    my ($self, $request, $scheme, $host, $port) = @_;
+
+    if ($self->{enable_SPDY}) {
+        my $handle  = HTTP::Tiny::Handle::SPDY->new(
+            timeout         => $self->{timeout},
+            SSL_options     => $self->{SSL_options},
+            verify_SSL      => $self->{verify_SSL},
+            local_address   => $self->{local_address},
+            keep_alive      => $self->{keep_alive},
+        );
+
+        if ($self->{_has_proxy}{$scheme} && ! grep { $host =~ /\Q$_\E$/ } @{$self->{no_proxy}}) {
+            return $self->_proxy_connect( $request, $handle );
+        }
+        else {
+            return $handle->connect($scheme, $host, $port);
+        }
+    }
+    else {
+        return $self->SUPER::_open_handle($request, $scheme, $host, $port);
+    }
 }
 
 package
