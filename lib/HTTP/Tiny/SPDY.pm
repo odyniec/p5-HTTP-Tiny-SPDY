@@ -15,12 +15,14 @@ use parent 'HTTP::Tiny';
 my @attributes;
 BEGIN {
     @attributes = qw(enable_SPDY);
+    ## no critic (NoStrict)
     no strict 'refs';
     for my $accessor (@attributes) {
         *{$accessor} = sub {
             @_ > 1 ? $_[0]->{$accessor} = $_[1] : $_[0]->{$accessor};
         };
     }
+    ## use critic
 }
 
 =method new
