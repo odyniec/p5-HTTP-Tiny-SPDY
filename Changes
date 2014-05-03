@@ -1,6 +1,8 @@
 Revision history for HTTP-Tiny-SPDY
 
 {{$NEXT}}
+
+0.020     2014-05-03
           Updated to work with the recent version of HTTP::Tiny.
 
 0.013     2013-10-14
