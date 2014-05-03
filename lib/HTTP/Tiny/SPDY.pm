@@ -348,7 +348,7 @@ sub write_request {
 sub _ssl_args {
     my ($self, $host) = @_;
 
-    my %ssl_args = $self->SUPER::_ssl_args($host);
+    my %ssl_args = %{$self->SUPER::_ssl_args($host)};
 
     $ssl_args{SSL_npn_protocols} = ['spdy/3'];
 
